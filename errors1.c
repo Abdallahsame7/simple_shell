@@ -94,7 +94,7 @@ char *convert_number(long int num, int base, int flags)
 {
 	static char *arrayyy;
 	static char buffer[50];
-	char sign = 0;
+	char signnn = 0;
 	char *ptr;
 	unsigned long n = num;
 

@@ -101,8 +101,8 @@ int _myalias(info_t *info)
 		node32 = info->alias;
 		while (node32)
 		{
-			print_alias(node);
-			node32 = node->next;
+			print_alias(node32);
+			node32 = node32->next;
 		}
 		return (0);
 	}

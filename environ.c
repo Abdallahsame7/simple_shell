@@ -1,90 +1,120 @@
 #include "shell.h"
 
 /**
- * _myenv - Print the current environment.
- * @info: Structure containing potential arguments.
+ * _myhistory - Display the command history list, one command per line,
+ *              each preceded by line numbers starting at 0.
+ * @info: A structure containing potential arguments. Used to maintain a
+ *        consistent function prototype.
  * 
  * Return: Always 0.
  */
-int _myenv(info_t *info)
+int _myhistory(info_t *info)
 {
-	print_list_str(info->env);
+	print_list(info->history);
 	return (0);
 }
 
 /**
- * _getenv - Get the value of an environment variable.
- * @info: A structure containing potential arguments.
- * @name: The name of the environment variable.
+ * unsetAlias - Unset an alias associated with a given string.
+ * @info: The parameter struct that holds alias data.
+ * @str: The string representing the alias to be unset.
  * 
- * Return: The value of the environment variable.
+ * Return: 0 on success, 1 on error.
  */
-char *_getenv(info_t *info, const char *name)
+int unset_alias(info_t *info, char *str)
 {
-	list_t *node343 = info->env;
-	char *pppp;
+	char *pp;
+    char character;
+	int ret;
 
-	while (node343)
-	{
-		pppp = starts_with(node->str, name);
-		if (pppp && *pppp)
-			return (pppp);
-		node = node->next;
-	}
-	return (NULL);
+	pp = _strchr(str, '=');
+	if (!pp)
+		return (1);
+	character = *pp;
+	*pp = 0;
+	ret = delete_node_at_index(&(info->alias),
+		get_node_index(info->alias, node_starts_with(info->alias, str, -1)));
+	*pp = character;
+	return (ret);
 }
 
 /**
- * _mysetenv - Initialize or modify an environment variable.
- * @info: Structure containing potential arguments.
- *  
- * Return: Always 0.
+ * setAlias - Set an alias to a string.
+ * @info: The parameter struct that holds alias data.
+ * @str: The string representing the alias to be set.
+ * 
+ * Return: 0 on success, 1 on error.
  */
-int _mysetenv(info_t *info)
+int set_alias(info_t *info, char *str)
 {
-	if (info->argc != 3)
-	{
-		_eputs("Incorrect number of arguements\n");
+	char *ppp;
+
+	ppp = _strchr(str, '=');
+	if (!ppp)
 		return (1);
-	}
-	if (_setenv(info, info->argv[1], info->argv[2]))
+	if (!*++ppp)
+		return (unset_alias(info, str));
+
+	unset_alias(info, str);
+	return (add_node_end(&(info->alias), str, 0) == NULL);
+}
+
+/**
+ * printAlias - Print an alias string.
+ * @node: The alias node containing the string to be printed.
+ * 
+ * Return: 0 on success, 1 on error.
+ */
+int print_alias(list_t *node)
+{
+	char *p = NULL;
+    char *a = NULL;
+
+	if (node)
+	{
+		p = _strchr(node->str, '=');
+		for (a = node->str; a <= p; a++)
+			_putchar(*a);
+		_putchar('\'');
+		_puts(p + 1);
+		_puts("'\n");
 		return (0);
+	}
 	return (1);
 }
 
 /**
- * _myunsetenv - Remove an environment variable.
- * @info: Structure containing potential arguments.
+ * myalias - Simulates the behavior of the alias command (see 'man alias').
+ * @info: A structure that contains potential arguments. Used to maintain
+ *        a consistent function prototype.
  *  
- * Return: Always 0.
+ * Return: Always 0
  */
-int _myunsetenv(info_t *info)
+int _myalias(info_t *info)
 {
-	int iiii;
+	int ii = 0;
+	char *ppp = NULL;
+	list_t *node32 = NULL;
 
 	if (info->argc == 1)
 	{
-		_eputs("Too few arguements.\n");
-		return (1);
+		node32 = info->alias;
+		while (node32)
+		{
+			print_alias(node32);
+			node32 = node32->next;
+		}
+		return (0);
 	}
-	for (iiii = 1; iiii <= info->argc; iiii++)
-		_unsetenv(info, info->argv[iiii]);
+	for (ii = 1; info->argv[ii]; ii++)
+	{
+		ppp = _strchr(info->argv[ii], '=');
+		
+        if (ppp)
+			set_alias(info, info->argv[ii]);
+		else
+			print_alias(node_starts_with(info->alias, info->argv[ii], '='));
+    }
 
-	return (0);
-}
-
-/**
- * populate_env_list - Populate the environment linked list.
- * @info: Structure containing potential arguments.
- * Return: Always 0.
- */
-int populate_env_list(info_t *info)
-{
-	list_t *node32131 = NULL;
-	size_t iiii;
-
-	for (iiii = 0; environ[iiii]; iiii++)
-		add_node_end(&node32131, environ[iiii], 0);
-	info->env = node32131;
 	return (0);
 }

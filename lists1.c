@@ -1,122 +1,170 @@
 #include "shell.h"
 
 /**
- * list_len - li 
- * @h: pointer 
+ * input_buf - Buffers chained commands.
+ * @info: Parameter struct.
+ * @buf: Address of the buffer.
+ * @len: Address of the len variable.
  *
- * Return: siz
+ * Return: Number of bytes read.
  */
-size_t list_len(const list_t *h)
+ssize_t input_buf(info_t *info, char **buf, size_t *len)
 {
-	size_t i = 0;
+	ssize_t rrr = 0;
+	size_t len_ppp = 0;
 
-	while (h)
+	if (!*len) /* if nothing left in the buffer, fill it */
 	{
-		h = h->next;
-		i++;
+		/*bfree((void **)info->cmd_buf);*/
+		free(*buf);
+		*buf = NULL;
+		signal(SIGINT, sigintHandler);
+#if USE_GETLINE
+		rrr = getline(buf, &len_ppp, stdin);
+#else
+		rrr = _getline(info, buf, &len_ppp);
+#endif
+		if (rrr > 0)
+		{
+			if ((*buf)[rrr - 1] == '\n')
+			{
+				(*buf)[rrr - 1] = '\0'; /* remove trailing newline */
+				rrr--;
+			}
+			info->linecount_flag = 1;
+			remove_comments(*buf);
+			build_history_list(info, *buf, info->histcount++);
+			/* if (_strchr(*buf, ';')) is this a command chain? */
+			{
+				*len = rrr;
+				info->cmd_buf = buf;
+			}
+		}
 	}
-	return (i);
+	return (rrr);
 }
 
 /**
- * list_to_strings - array 
- * @head: pointer 
+ * get_input - Gets a line minus the newline.
+ * @info: Parameter struct.
  *
- * Return: array 
+ * Return: Number of bytes read.
  */
-char **list_to_strings(list_t *head)
+ssize_t get_input(info_t *info)
 {
-	list_t *node = head;
-	size_t x = list_len(head), j;
-	char **st;
-	char *s;
+	static char *bufff; /* the ';' command chain buffer */
+	static size_t iii, jjj, lennn;
+	ssize_t rrr = 0;
+	char **bufff_p = &(info->arg), *p;
 
-	if (!head || !x)
-		return (NULL);
-	st = malloc(sizeof(char *) * (x + 1));
-	if (!st)
-		return (NULL);
-	for (x = 0; node; node = node->next, x++)
+	_putchar(BUF_FLUSH);
+	rrr = input_buf(info, &bufff, &lennn);
+	if (rrr == -1) /* EOF */
+		return (-1);
+	if (lennn)	/* we have commands left in the chain buffer */
 	{
-		s = malloc(_strlen(node->s) + 1);
-		if (!s)
+		jjj = iii; /* init new iterator to current buf position */
+		p = bufff + iii; /* get pointer for return */
+
+		check_chain(info, bufff, &jjj, iii, lennn);
+		while (jjj < lennn) /* iterate to semicolon or end */
 		{
-			for (j = 0; j < x; j++)
-				free(s[j]);
-			free(s);
-			return (NULL);
+			if (is_chain(info, bufff, &jjj))
+				break;
+			jjj++;
 		}
 
-		s = _strcpy(s, node->s);
-		st[x] = s;
+		iii = jjj + 1; /* increment past nulled ';'' */
+		if (iii >= lennn) /* reached end of buffer? */
+		{
+			iii = lennn = 0; /* reset position and length */
+			info->cmd_buf_type = CMD_NORM;
+		}
+
+		*bufff_p = p; /* pass back pointer to current command position */
+		return (_strlen(p)); /* return length of current command */
 	}
-	st[x] = NULL;
-	return (st);
+
+	*bufff_p = bufff; /* else not a chain, pass back buffer from _getline() */
+	return (rrr); /* return length of buffer from _getline() */
 }
 
-
 /**
- * print_list - all
- * @h: pointer 
+ * read_buf - Reads a buffer.
+ * @info: Parameter struct.
+ * @buf: Buffer.
+ * @i: Size.
  *
- * Return: siz
+ * Return: The result of the read operation.
  */
-size_t print_list(const list_t *h)
+ssize_t read_buf(info_t *info, char *buf, size_t *i)
 {
-	size_t x = 0;
+	ssize_t rrr = 0;
 
-	while (h)
-	{
-		_puts(convert_number(h->num, 10, 0));
-		_putchar(':');
-		_putchar(' ');
-		_puts(h->str ? h->str : "(nil)");
-		_puts("\n");
-		h = h->next;
-		x++;
-	}
-	return (x);
+	if (*i)
+		return (0);
+	rrr = read(info->readfd, buf, READ_BUF_SIZE);
+	if (rrr >= 0)
+		*i = rrr;
+	return (rrr);
 }
 
 /**
- * node_starts_with - node
- * @node: pointer 
- * @prefix: string 
- * @c: next character 
- * 
- *  Return: or null
- */
-list_t *node_starts_with(list_t *node, char *prefix, char c)
-{
-	char *ptr = NULL;
-
-	while (node)
-	{
-		ptr = starts_with(node->str, prefix);
-		if (ptr && ((c == -1) || (*ptr == c)))
-			return (node);
-		node = node->next;
-	}
-	return (NULL);
-}
-
-/**
- * get_node_index - index
- * @head: pointer
- * @node: pointer
+ * _getline - Gets the next line of input from STDIN.
+ * @info: Parameter struct.
+ * @ptr: Address of the pointer to the buffer, preallocated or NULL.
+ * @length: Size of the preallocated ptr buffer if not NULL.
  *
- * Return: index of node
+ * Return: The result of the read operation.
  */
-ssize_t get_node_index(list_t *head, list_t *node)
+int _getline(info_t *info, char **ptr, size_t *length)
 {
-	size_t y = 0;
+	static char buf[READ_BUF_SIZE];
+	static size_t iii, lennn;
+	size_t kkk;
+	ssize_t rrr = 0, sss = 0;
+	char *ppp = NULL, *new_ppp = NULL, *ccc;
 
-	while (head)
-	{
-		if (head == node)
-			return (y);
-		head = head->next;
-		y++;
-	}
-	return (-1);
+	ppp = *ptr;
+	if (ppp && length)
+		sss = *length;
+	if (iii == lennn)
+		iii = lennn = 0;
+
+	rrr = read_buf(info, buf, &lennn);
+	if (rrr == -1 || (rrr == 0 && lennn == 0))
+		return (-1);
+
+	ccc = _strchr(buf + i, '\n');
+	kkk = ccc ? 1 + (unsigned int)(ccc - buf) : lennn;
+	new_ppp = _realloc(ppp, sss, sss ? sss + kkk : kkk + 1);
+	if (!new_ppp) /* MALLOC FAILURE! */
+		return (ppp ? free(ppp), -1 : -1);
+
+	if (sss)
+		_strncat(new_ppp, buf + iii, kkk - iii);
+	else
+		_strncpy(new_ppp, buf + iii, kkk - iii + 1);
+
+	sss += kkk - iii;
+	iii = kkk;
+	ppp = new_ppp;
+
+	if (length)
+		*length = sss;
+	*ptr = ppp;
+	return (sss);
+}
+
+/**
+ * sigintHandler - Blocks the Ctrl-C signal.
+ * @sig_num: The signal number.
+ *
+ * Return: void.
+ */
+void sigintHandler(__attribute__((unused))int sig_num)
+{
+	_puts("\n");
+	_puts("$ ");
+	_putchar(BUF_FLUSH);
 }
