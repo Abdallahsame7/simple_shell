@@ -1,120 +1,92 @@
 #include "shell.h"
 
 /**
- * _myhistory - Display the command history list, one command per line,
- *              each preceded by line numbers starting at 0.
- * @info: A structure containing potential arguments. Used to maintain a
- *        consistent function prototype.
- * 
- * Return: Always 0.
+ * _myenv - prints the current environment
+ * @info: Structure containing potential arguments. Used to maintain
+ *          constant function prototype.
+ * Return: Always 0
  */
-int _myhistory(info_t *info)
+int _myenv(info_t *info)
 {
-	print_list(info->history);
+	print_list_str(info->env);
 	return (0);
 }
 
 /**
- * unsetAlias - Unset an alias associated with a given string.
- * @info: The parameter struct that holds alias data.
- * @str: The string representing the alias to be unset.
- * 
- * Return: 0 on success, 1 on error.
+ * _getenv - gets the value of an environ variable
+ * @info: Structure containing potential arguments. Used to maintain
+ * @name: env var name
+ *
+ * Return: the value
  */
-int unset_alias(info_t *info, char *str)
+char *_getenv(info_t *info, const char *name)
 {
-	char *pp;
-    char character;
-	int ret;
-
-	pp = _strchr(str, '=');
-	if (!pp)
-		return (1);
-	character = *pp;
-	*pp = 0;
-	ret = delete_node_at_index(&(info->alias),
-		get_node_index(info->alias, node_starts_with(info->alias, str, -1)));
-	*pp = character;
-	return (ret);
-}
-
-/**
- * setAlias - Set an alias to a string.
- * @info: The parameter struct that holds alias data.
- * @str: The string representing the alias to be set.
- * 
- * Return: 0 on success, 1 on error.
- */
-int set_alias(info_t *info, char *str)
-{
+	list_t *nodeee = info->env;
 	char *ppp;
 
-	ppp = _strchr(str, '=');
-	if (!ppp)
-		return (1);
-	if (!*++ppp)
-		return (unset_alias(info, str));
-
-	unset_alias(info, str);
-	return (add_node_end(&(info->alias), str, 0) == NULL);
+	while (nodeee)
+	{
+		ppp = starts_with(nodeee->str, name);
+		if (ppp && *ppp)
+			return (ppp);
+		nodeee = nodeee->next;
+	}
+	return (NULL);
 }
 
 /**
- * printAlias - Print an alias string.
- * @node: The alias node containing the string to be printed.
- * 
- * Return: 0 on success, 1 on error.
+ * _mysetenv - Initialize a new environment variable,
+ *             or modify an existing one
+ * @info: Structure containing potential arguments. Used to maintain
+ *        constant function prototype.
+ *  Return: Always 0
  */
-int print_alias(list_t *node)
+int _mysetenv(info_t *info)
 {
-	char *p = NULL;
-    char *a = NULL;
-
-	if (node)
+	if (info->argc != 3)
 	{
-		p = _strchr(node->str, '=');
-		for (a = node->str; a <= p; a++)
-			_putchar(*a);
-		_putchar('\'');
-		_puts(p + 1);
-		_puts("'\n");
-		return (0);
+		_eputs("Incorrect number of arguements\n");
+		return (1);
 	}
+	if (_setenv(info, info->argv[1], info->argv[2]))
+		return (0);
 	return (1);
 }
 
 /**
- * myalias - Simulates the behavior of the alias command (see 'man alias').
- * @info: A structure that contains potential arguments. Used to maintain
- *        a consistent function prototype.
- *  
- * Return: Always 0
+ * _myunsetenv - Remove an environment variable
+ * @info: Structure containing potential arguments. Used to maintain
+ *        constant function prototype.
+ *  Return: Always 0
  */
-int _myalias(info_t *info)
+int _myunsetenv(info_t *info)
 {
-	int ii = 0;
-	char *ppp = NULL;
-	list_t *node32 = NULL;
+	int iii;
 
 	if (info->argc == 1)
 	{
-		node32 = info->alias;
-		while (node32)
-		{
-			print_alias(node32);
-			node32 = node32->next;
-		}
-		return (0);
+		_eputs("Too few arguements.\n");
+		return (1);
 	}
-	for (ii = 1; info->argv[ii]; ii++)
-	{
-		ppp = _strchr(info->argv[ii], '=');
-		
-        if (ppp)
-			set_alias(info, info->argv[ii]);
-		else
-			print_alias(node_starts_with(info->alias, info->argv[ii], '='));
-    }
+	for (iii = 1; iii <= info->argc; iii++)
+		_unsetenv(info, info->argv[iii]);
 
+	return (0);
+}
+
+/**
+ * populate_env_list - populates env linked list
+ * @info: Structure containing potential arguments. Used to maintain
+ *          constant function prototype.
+ * Return: Always 0
+ */
+int populate_env_list(info_t *info)
+{
+	list_t *nodeee = NULL;
+	size_t iii;
+
+	for (iii = 0; environ[iii]; iii++)
+		add_node_end(&nodeee, environ[iii], 0);
+	info->env = nodeee;
 	return (0);
 }
