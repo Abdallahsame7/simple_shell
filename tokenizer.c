@@ -40,7 +40,7 @@ char **strtow(char *str, char *d)
 			free(h);
 			return (NULL);
 		}
-		for (mm = 0; m < kk; mm++)
+		for (mm = 0; mm < kk; mm++)
 			h[j][mm] = str[i++];
 		h[j][mm] = 0;
 	}
@@ -77,7 +77,7 @@ char **strtow2(char *str, char d)
 		kk = 0;
 		while (str[i + kk] != d && str[i + kk] && str[i + kk] != d)
 			kk++;
-		h[j] = malloc((k + 1) * sizeof(char));
+		h[j] = malloc((kk + 1) * sizeof(char));
 		if (!h[j])
 		{
 			for (kk = 0; kk < j; kk++)
@@ -85,7 +85,7 @@ char **strtow2(char *str, char d)
 			free(h);
 			return (NULL);
 		}
-		for (mm = 0; m < kk; mm++)
+		for (mm = 0; mm < kk; mm++)
 			h[j][mm] = str[i++];
 		h[j][mm] = 0;
 	}

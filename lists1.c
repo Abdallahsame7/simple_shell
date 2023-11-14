@@ -135,7 +135,7 @@ int _getline(info_t *info, char **ptr, size_t *length)
 	if (rrr == -1 || (rrr == 0 && lennn == 0))
 		return (-1);
 
-	ccc = _strchr(buf + i, '\n');
+	ccc = _strchr(buf + iii, '\n');
 	kkk = ccc ? 1 + (unsigned int)(ccc - buf) : lennn;
 	new_ppp = _realloc(ppp, sss, sss ? sss + kkk : kkk + 1);
 	if (!new_ppp) /* MALLOC FAILURE! */

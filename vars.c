@@ -83,14 +83,14 @@ int replace_alias(info_t *info)
 
 	for (i = 0; i < 10; i++)
 	{
-		nodo = nodo_starts_with(info->alias, info->argv[0], '=');
+		nodo = node_starts_with(info->alias, info->argv[0], '=');
 		if (!nodo)
 			return (0);
 		free(info->argv[0]);
 		ptr = _strchr(nodo->str, '=');
 		if (!ptr)
 			return (0);
-		p = _strdup(ptr + 1);
+		ptr = _strdup(ptr + 1);
 		if (!ptr)
 			return (0);
 		info->argv[0] = ptr;
@@ -126,7 +126,7 @@ int replace_vars(info_t *info)
 				_strdup(convert_number(getpid(), 10, 0)));
 			continue;
 		}
-		nodo = nodo_starts_with(info->env, &info->argv[i][1], '=');
+		nodo = node_starts_with(info->env, &info->argv[i][1], '=');
 		if (nodo)
 		{
 			replace_string(&(info->argv[i]),
