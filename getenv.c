@@ -1,170 +1,93 @@
 #include "shell.h"
 
 /**
- * input_buf - Buffers chained commands.
- * @info: Parameter struct.
- * @buf: Address of the buffer.
- * @len: Address of the len variable.
- *
- * Return: Number of bytes read.
+ * get_environ - returns the string array copy of our environ
+ * @info: Structure containing potential arguments. Used to maintain
+ *          constant function prototype.
+ * Return: Always 0
  */
-ssize_t input_buf(info_t *info, char **buf, size_t *len)
+char **get_environ(info_t *info)
 {
-	ssize_t rrr = 0;
-	size_t len_ppp = 0;
-
-	if (!*len) /* if nothing left in the buffer, fill it */
+	if (!info->environ || info->env_changed)
 	{
-		/*bfree((void **)info->cmd_buf);*/
-		free(*buf);
-		*buf = NULL;
-		signal(SIGINT, sigintHandler);
-#if USE_GETLINE
-		rrr = getline(buf, &len_ppp, stdin);
-#else
-		rrr = _getline(info, buf, &len_ppp);
-#endif
-		if (rrr > 0)
-		{
-			if ((*buf)[rrr - 1] == '\n')
-			{
-				(*buf)[rrr - 1] = '\0'; /* remove trailing newline */
-				rrr--;
-			}
-			info->linecount_flag = 1;
-			remove_comments(*buf);
-			build_history_list(info, *buf, info->histcount++);
-			/* if (_strchr(*buf, ';')) is this a command chain? */
-			{
-				*len = rrr;
-				info->cmd_buf = buf;
-			}
-		}
+		info->environ = list_to_strings(info->env);
+		info->env_changed = 0;
 	}
-	return (rrr);
+
+	return (info->environ);
 }
 
 /**
- * get_input - Gets a line minus the newline.
- * @info: Parameter struct.
- *
- * Return: Number of bytes read.
+ * _unsetenv - Remove an environment variable
+ * @info: Structure containing potential arguments. Used to maintain
+ *        constant function prototype.
+ *  Return: 1 on delete, 0 otherwise
+ * @var: the string env var property
  */
-ssize_t get_input(info_t *info)
+int _unsetenv(info_t *info, char *var)
 {
-	static char *bufff; /* the ';' command chain buffer */
-	static size_t iii, jjj, lennn;
-	ssize_t rrr = 0;
-	char **bufff_p = &(info->arg), *p;
+	list_t *nodeee = info->env;
+	size_t iii = 0;
+	char *ppp;
 
-	_putchar(BUF_FLUSH);
-	rrr = input_buf(info, &bufff, &lennn);
-	if (rrr == -1) /* EOF */
-		return (-1);
-	if (lennn)	/* we have commands left in the chain buffer */
-	{
-		jjj = iii; /* init new iterator to current buf position */
-		p = bufff + iii; /* get pointer for return */
-
-		check_chain(info, bufff, &jjj, iii, lennn);
-		while (jjj < lennn) /* iterate to semicolon or end */
-		{
-			if (is_chain(info, bufff, &jjj))
-				break;
-			jjj++;
-		}
-
-		iii = jjj + 1; /* increment past nulled ';'' */
-		if (iii >= lennn) /* reached end of buffer? */
-		{
-			iii = lennn = 0; /* reset position and length */
-			info->cmd_buf_type = CMD_NORM;
-		}
-
-		*bufff_p = p; /* pass back pointer to current command position */
-		return (_strlen(p)); /* return length of current command */
-	}
-
-	*bufff_p = bufff; /* else not a chain, pass back buffer from _getline() */
-	return (rrr); /* return length of buffer from _getline() */
-}
-
-/**
- * read_buf - Reads a buffer.
- * @info: Parameter struct.
- * @buf: Buffer.
- * @i: Size.
- *
- * Return: The result of the read operation.
- */
-ssize_t read_buf(info_t *info, char *buf, size_t *i)
-{
-	ssize_t rrr = 0;
-
-	if (*i)
+	if (!nodeee || !var)
 		return (0);
-	rrr = read(info->readfd, buf, READ_BUF_SIZE);
-	if (rrr >= 0)
-		*i = rrr;
-	return (rrr);
+
+	while (nodeee)
+	{
+		ppp = starts_with(nodeee->str, var);
+		if (ppp && *ppp == '=')
+		{
+			info->env_changed = delete_node_at_index(&(info->env), iii);
+			iii = 0;
+			nodeee = info->env;
+			continue;
+		}
+		nodeee = nodeee->next;
+		iii++;
+	}
+	return (info->env_changed);
 }
 
 /**
- * _getline - Gets the next line of input from STDIN.
- * @info: Parameter struct.
- * @ptr: Address of the pointer to the buffer, preallocated or NULL.
- * @length: Size of the preallocated ptr buffer if not NULL.
- *
- * Return: The result of the read operation.
+ * _setenv - Initialize a new environment variable,
+ *             or modify an existing one
+ * @info: Structure containing potential arguments. Used to maintain
+ *        constant function prototype.
+ * @var: the string env var property
+ * @value: the string env var value
+ *  Return: Always 0
  */
-int _getline(info_t *info, char **ptr, size_t *length)
+int _setenv(info_t *info, char *var, char *value)
 {
-	static char buf[READ_BUF_SIZE];
-	static size_t iii, lennn;
-	size_t kkk;
-	ssize_t rrr = 0, sss = 0;
-	char *ppp = NULL, *new_ppp = NULL, *ccc;
+	char *bufff = NULL;
+	list_t *nodeee;
+	char *ppp;
 
-	ppp = *ptr;
-	if (ppp && length)
-		sss = *length;
-	if (iii == lennn)
-		iii = lennn = 0;
+	if (!var || !value)
+		return (0);
 
-	rrr = read_buf(info, buf, &lennn);
-	if (rrr == -1 || (rrr == 0 && lennn == 0))
-		return (-1);
-
-	ccc = _strchr(buf + iii, '\n');
-	kkk = ccc ? 1 + (unsigned int)(ccc - buf) : lennn;
-	new_ppp = _realloc(ppp, sss, sss ? sss + kkk : kkk + 1);
-	if (!new_ppp) /* MALLOC FAILURE! */
-		return (ppp ? free(ppp), -1 : -1);
-
-	if (sss)
-		_strncat(new_ppp, buf + iii, kkk - iii);
-	else
-		_strncpy(new_ppp, buf + iii, kkk - iii + 1);
-
-	sss += kkk - iii;
-	iii = kkk;
-	ppp = new_ppp;
-
-	if (length)
-		*length = sss;
-	*ptr = ppp;
-	return (sss);
-}
-
-/**
- * sigintHandler - Blocks the Ctrl-C signal.
- * @sig_num: The signal number.
- *
- * Return: void.
- */
-void sigintHandler(__attribute__((unused))int sig_num)
-{
-	_puts("\n");
-	_puts("$ ");
-	_putchar(BUF_FLUSH);
+	bufff = malloc(_strlen(var) + _strlen(value) + 2);
+	if (!bufff)
+		return (1);
+	_strcpy(bufff, var);
+	_strcat(bufff, "=");
+	_strcat(bufff, value);
+	nodeee = info->env;
+	while (nodeee)
+	{
+		ppp = starts_with(nodeee->str, var);
+		if (ppp && *ppp == '=')
+		{
+			free(nodeee->str);
+			nodeee->str = bufff;
+			info->env_changed = 1;
+			return (0);
+		}
+		nodeee = nodeee->next;
+	}
+	add_node_end(&(info->env), bufff, 0);
+	free(bufff);
+	info->env_changed = 1;
+	return (0);
 }

@@ -1,170 +1,122 @@
 #include "shell.h"
 
 /**
- * input_buf - Buffers chained commands.
- * @info: Parameter struct.
- * @buf: Address of the buffer.
- * @len: Address of the len variable.
+ * list_len - determines length of linked list
+ * @h: pointer to first nodeee
  *
- * Return: Number of bytes read.
+ * Return: size of list
  */
-ssize_t input_buf(info_t *info, char **buf, size_t *len)
+size_t list_len(const list_t *h)
 {
-	ssize_t rrr = 0;
-	size_t len_ppp = 0;
+	size_t iii = 0;
 
-	if (!*len) /* if nothing left in the buffer, fill it */
+	while (h)
 	{
-		/*bfree((void **)info->cmd_buf);*/
-		free(*buf);
-		*buf = NULL;
-		signal(SIGINT, sigintHandler);
-#if USE_GETLINE
-		rrr = getline(buf, &len_ppp, stdin);
-#else
-		rrr = _getline(info, buf, &len_ppp);
-#endif
-		if (rrr > 0)
-		{
-			if ((*buf)[rrr - 1] == '\n')
-			{
-				(*buf)[rrr - 1] = '\0'; /* remove trailing newline */
-				rrr--;
-			}
-			info->linecount_flag = 1;
-			remove_comments(*buf);
-			build_history_list(info, *buf, info->histcount++);
-			/* if (_strchr(*buf, ';')) is this a command chain? */
-			{
-				*len = rrr;
-				info->cmd_buf = buf;
-			}
-		}
+		h = h->next;
+		iii++;
 	}
-	return (rrr);
+	return (iii);
 }
 
 /**
- * get_input - Gets a line minus the newline.
- * @info: Parameter struct.
+ * list_to_strings - returns an array of strings of the list->str
+ * @head: pointer to first nodeee
  *
- * Return: Number of bytes read.
+ * Return: array of strings
  */
-ssize_t get_input(info_t *info)
+char **list_to_strings(list_t *head)
 {
-	static char *bufff; /* the ';' command chain buffer */
-	static size_t iii, jjj, lennn;
-	ssize_t rrr = 0;
-	char **bufff_p = &(info->arg), *p;
+	list_t *nodeee = head;
+	size_t iii = list_len(head), j;
+	char **strs;
+	char *str;
 
-	_putchar(BUF_FLUSH);
-	rrr = input_buf(info, &bufff, &lennn);
-	if (rrr == -1) /* EOF */
-		return (-1);
-	if (lennn)	/* we have commands left in the chain buffer */
+	if (!head || !iii)
+		return (NULL);
+	strs = malloc(sizeof(char *) * (iii + 1));
+	if (!strs)
+		return (NULL);
+	for (iii = 0; nodeee; nodeee = nodeee->next, iii++)
 	{
-		jjj = iii; /* init new iterator to current buf position */
-		p = bufff + iii; /* get pointer for return */
-
-		check_chain(info, bufff, &jjj, iii, lennn);
-		while (jjj < lennn) /* iterate to semicolon or end */
+		str = malloc(_strlen(nodeee->str) + 1);
+		if (!str)
 		{
-			if (is_chain(info, bufff, &jjj))
-				break;
-			jjj++;
+			for (j = 0; j < iii; j++)
+				free(strs[j]);
+			free(strs);
+			return (NULL);
 		}
 
-		iii = jjj + 1; /* increment past nulled ';'' */
-		if (iii >= lennn) /* reached end of buffer? */
-		{
-			iii = lennn = 0; /* reset position and length */
-			info->cmd_buf_type = CMD_NORM;
-		}
-
-		*bufff_p = p; /* pass back pointer to current command position */
-		return (_strlen(p)); /* return length of current command */
+		str = _strcpy(str, nodeee->str);
+		strs[iii] = str;
 	}
+	strs[iii] = NULL;
+	return (strs);
+}
 
-	*bufff_p = bufff; /* else not a chain, pass back buffer from _getline() */
-	return (rrr); /* return length of buffer from _getline() */
+
+/**
+ * print_list - prints all elements of a list_t linked list
+ * @h: pointer to first nodeee
+ *
+ * Return: size of list
+ */
+size_t print_list(const list_t *h)
+{
+	size_t iii = 0;
+
+	while (h)
+	{
+		_puts(convert_number(h->num, 10, 0));
+		_putchar(':');
+		_putchar(' ');
+		_puts(h->str ? h->str : "(nil)");
+		_puts("\n");
+		h = h->next;
+		iii++;
+	}
+	return (iii);
 }
 
 /**
- * read_buf - Reads a buffer.
- * @info: Parameter struct.
- * @buf: Buffer.
- * @i: Size.
+ * nodeee_starts_with - returns nodeee whose string starts with prefix
+ * @node: pointer to list head
+ * @prefix: string to match
+ * @c: the next character after prefix to match
  *
- * Return: The result of the read operation.
+ * Return: match node or null
  */
-ssize_t read_buf(info_t *info, char *buf, size_t *i)
+list_t *node_starts_with(list_t *node, char *prefix, char c)
 {
-	ssize_t rrr = 0;
+	char *ppp = NULL;
 
-	if (*i)
-		return (0);
-	rrr = read(info->readfd, buf, READ_BUF_SIZE);
-	if (rrr >= 0)
-		*i = rrr;
-	return (rrr);
+	while (node)
+	{
+		ppp = starts_with(node->str, prefix);
+		if (ppp && ((c == -1) || (*ppp == c)))
+			return (node);
+		node = node->next;
+	}
+	return (NULL);
 }
 
 /**
- * _getline - Gets the next line of input from STDIN.
- * @info: Parameter struct.
- * @ptr: Address of the pointer to the buffer, preallocated or NULL.
- * @length: Size of the preallocated ptr buffer if not NULL.
+ * get_nodeee_index - gets the index of a nodeee
+ * @head: pointer to list head
+ * @node: pointer to the nodeee
  *
- * Return: The result of the read operation.
+ * Return: index of nodeee or -1
  */
-int _getline(info_t *info, char **ptr, size_t *length)
+ssize_t get_node_index(list_t *head, list_t *node)
 {
-	static char buf[READ_BUF_SIZE];
-	static size_t iii, lennn;
-	size_t kkk;
-	ssize_t rrr = 0, sss = 0;
-	char *ppp = NULL, *new_ppp = NULL, *ccc;
+	size_t iii = 0;
 
-	ppp = *ptr;
-	if (ppp && length)
-		sss = *length;
-	if (iii == lennn)
-		iii = lennn = 0;
-
-	rrr = read_buf(info, buf, &lennn);
-	if (rrr == -1 || (rrr == 0 && lennn == 0))
-		return (-1);
-
-	ccc = _strchr(buf + iii, '\n');
-	kkk = ccc ? 1 + (unsigned int)(ccc - buf) : lennn;
-	new_ppp = _realloc(ppp, sss, sss ? sss + kkk : kkk + 1);
-	if (!new_ppp) /* MALLOC FAILURE! */
-		return (ppp ? free(ppp), -1 : -1);
-
-	if (sss)
-		_strncat(new_ppp, buf + iii, kkk - iii);
-	else
-		_strncpy(new_ppp, buf + iii, kkk - iii + 1);
-
-	sss += kkk - iii;
-	iii = kkk;
-	ppp = new_ppp;
-
-	if (length)
-		*length = sss;
-	*ptr = ppp;
-	return (sss);
-}
-
-/**
- * sigintHandler - Blocks the Ctrl-C signal.
- * @sig_num: The signal number.
- *
- * Return: void.
- */
-void sigintHandler(__attribute__((unused))int sig_num)
-{
-	_puts("\n");
-	_puts("$ ");
-	_putchar(BUF_FLUSH);
+	while (head)
+	{
+		if (head == node)
+			return (iii);
+		head = head->next;
+		iii++;
+	}
+	return (-1);
 }
